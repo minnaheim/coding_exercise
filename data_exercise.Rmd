@@ -1,0 +1,244 @@
+---
+title: "Police Militarization Data"
+author: "Minna Heim"
+date: "2023-02-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+```
+
+# Task i
+
+```{r}
+#  first, i want to inspect the data to see which state this data is on, and to get an overview on how to merge the data
+data_1 <- read_csv("data.csv", show_col_types = FALSE)
+data_2 <- read_csv("data2.csv", show_col_types = FALSE) 
+
+view(data_1)
+view(data_2)
+head(data_1)
+head(data_2)
+
+```
+
+
+```{r}
+# Before merging, i have to change the column name of "county" in data_2 = "fips", so that i can merge the datasets based on this variable. 
+# data_2 <- data_2 %>% rename(fips = "county")
+
+# checking for duplications
+nrow(data_1[duplicated(data_1), ])
+
+nrow(data_2[duplicated(data_2), ])
+
+```
+
+There are 3106 Duplications in the dataset 2. Should consider only extracting the data which is unique, with the function unique().
+
+
+```{r}
+# Renaming:
+# data_2 <- data_2 %>% rename(fips = "county")
+
+# Merging:
+# We are merging according to two versions, one with the duplicated data, and the other without.
+
+
+
+# data <- data_1 %>% full_join(data_2, by = c("year", "fips")) 
+
+
+
+data_left <- data_1 %>% left_join(data_2, by = c("year", "fips"))
+head(data_left)
+
+```
+Although I changed the type of merge now, i will not change the dataset now for the exercises below.
+
+# Task ii
+
+```{r}
+# income
+summary(data_left$income)
+```
+
+```{r}
+income_plot <- ggplot(data_left, aes(income)) + geom_boxplot()
+income_plot
+```
+
+
+```{r}
+# population
+summary(data_left$pop)
+```
+
+When looking at the variable population, we can see the following:
+
+- there are many population observations that have the value "999999", and when trying to plot the population column with the variable year, the error "3105 rows containing non-finite values (`stat_sum()`)" appears. This leads me to believe, that there are a couple of population obseverations in this dataset that are incorrect / placeholder values. 
+
+```{r}
+# population
+pop_plot <- ggplot(data, aes(pop)) + geom_boxplot()
+pop_plot
+```
+
+
+```{r}
+# poverty
+summary(data$pov)
+# plotting the poverty rates in year, to see the frequency of certain poverty rates appearing
+
+pov_plot <- ggplot(data, aes(pov, year)) + geom_count()
+pov_plot
+```
+
+
+
+```{r}
+
+pov_plot_2 <- ggplot(data, aes(pov, year)) + geom_point()
+pov_plot_2
+```
+
+
+
+What I can see from the variable poverty (calculated in percent):
+
+- is that the maximum value is 120%. This seems rather implausible. Also,when looking at the frequency of the appearance of the observation 120, we can see that this appears often, see the plot. Maybe this is another placeholder value.
+
+```{r}
+# military equipment received
+summary(data$mil_equip_received)
+# plotting the poverty rates in year, to see the frequency of certain poverty rates appearing
+
+
+```
+
+```{r}
+# military equipment received
+mil_equip_plot <- ggplot(data, aes(mil_equip_received)) + geom_boxplot()
+mil_equip_plot
+```
+
+# Task iii
+
+## Task iii (i)
+```{r}
+inc_mil_model <- lm(income ~ mil_equip_received, data)
+summary(inc_mil_model)
+```
+This simple linear regression shows us the following: 
+
+The first intercept is average county median household income in dollars, when the total value of military equipment acquired by local police forces in a given county/year is equal to 0. The second coefficient (beta1) shows us that when the total value of military equipment acquired by local police forces in a given county/year increases by one dollar, that the income increases by 0.01225 percent, holding all else constant.Both coefficients are significant on a niveau of 0.001.
+
+
+```{r}
+inc_mil_correlation <- cor.test(data$income, data$mil_equip_received, 
+                    method = "pearson")
+
+inc_mil_correlation
+```
+I calculated the Pearson Correlation again, and it looks as though this result is significant because the p value is < 2.2e-16, which is less than the significance level of 0.05. This correlation test shows that these two variables are only slightly correlated, with a correlation coefficient of 0.09699056. These two variables are positively correlated, which means that they relationship of these two variables moves in the same direction, i.e. when income increases, so does military spending.
+
+Interpreting these two correlation tests, I can see the following. 
+
+Since there is a slight positive correlation between these two variables (even when both correlation measures show the correlation to be of different size) and we can see that a one dollar increase in military  equipment, that income increases by 0.0122 percent.
+
+## Task iii (ii)
+
+```{r}
+pov_mil_model <- lm(pov ~ mil_equip_received, data)
+summary(pov_mil_model)
+```
+This simple linear regression shows us the following: 
+
+The first intercept is county poverty rate (in percent), when the total value of military equipment acquired by local police forces in a given county/year is equal to 0. The second coefficient (beta1) shows us that when the total value of military equipment acquired by local police forces in a given county/year increases by one dollar, that the poverty rate increases by 0.000001516 percent, holding all else constant. Both coefficients are significant on a level of 0.001.
+
+
+```{r}
+pov_mil_correlation <- cor.test(data$pov, data$mil_equip_received, 
+                    method = "pearson")
+
+pov_mil_correlation
+```
+Looking at the pearson's correlation again, we can see the following:
+There is a slight positive correlation between the poverty rate variables and the military equipment variable. Also, the p value here is 0.00022, which is less than the 0.05 significance level, making this result statistically significant. 
+
+
+Looking at both of the correlation tests: income ~ mil_equip_received and pov ~ mil_equip_received, I would like to point out the following. 
+
+- There are slightly positive correlations between both income and military equipment and poverty and military equipment
+
+- Still, there is a stronger correlation between income and military equipment, rather than with military and poverty.
+
+Overall, however, it looks like more military material tends to go to richer counties.
+
+# Task iv
+
+```{r}
+# I will create the variable "cumulative_equip_received" to be a new dataframe containing only the fips in one column and in the other the sum of the military equipment received.
+
+cumulative_equip_received_1001_1 <- data %>% group_by(fips) %>% summarise(county_total_equip_received = sum(mil_equip_received))
+cumulative_equip_received_1001_1
+```
+
+
+
+# Task v
+
+```{r}
+# I was confused here, unclear whether to take just the military equipment divided by the population, or to take the average military equipment (over all counties) and then divide this by the population. 
+
+mil_equip_pp_yearly <- data %>% group_by(year) %>% mutate(avg_mil_equip = mean(mil_equip_received)) %>% mutate(avg_mil_equip_pp = (avg_mil_equip/pop))
+
+head(mil_equip_pp_yearly)
+```
+
+```{r}
+# Plotting the series
+
+# I decided to remove all of the variables that i will not plot, just to make it clearer for me
+
+mil_equip_pp_yearly_df <- mil_equip_pp_yearly %>% select(-fips, -county_name, -income, -pop, -avg_mil_equip, -mil_equip_received, -pov)
+# head(mil_equip_pp_yearly_df)
+
+mil_equip_pp_yearly_plot <- ggplot(mil_equip_pp_yearly_df, aes(year, avg_mil_equip_pp)) + 
+                            geom_col() + 
+                            labs(title =  "Average Value of Military Equipment Acquired per Capita, per Year (in USD)", x = "Year", y = "Average Military Equiplment Acquired per Capita (USD)")
+
+mil_equip_pp_yearly_plot
+
+```
+
+Interpretation: As we can see from the graph, the highest average value of military equipment acquired by local police forces per capita was the highest in the year 2012.
+
+# Task vi
+
+```{r}
+# filter out rows with no military equipment received (we are only looking at the years where equip was delivered)
+filtered_data <- data %>% filter(mil_equip_received > 0)
+
+# group by fips and select minimum year, to see when each county received their first mil equip
+filtered_data <- filtered_data %>% group_by(fips) %>% mutate(first_year_rec = min(year, na.rm = TRUE))
+
+# select only the first year received and remove the others.
+filtered_data <- filtered_data %>% filter(year == first_year_rec)
+
+
+# remove all that received in 2000.
+filtered_data <- filtered_data %>% filter(first_year_rec > 2000)
+view(filtered_data)
+
+# Order by size of military equipment
+filtered_data <- filtered_data %>% arrange(desc(mil_equip_received))
+head(filtered_data)
+
+```
+
+**final verdict:** The county Payne, OK has acquired the largest initial equipment in 2014. 
+
+The End. 
